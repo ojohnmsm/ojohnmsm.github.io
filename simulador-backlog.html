@@ -165,6 +165,7 @@ table.edit tr.mp-row td{background:var(--danger-soft)}
 table.edit input[type=checkbox]{width:auto;margin:0;cursor:pointer;accent-color:var(--accent)}
 table.edit tr.off td:not(.chk):not(.acts){opacity:.42}
 table.edit tr.off input[data-f=nome],table.edit tr.off input[data-f=descricao]{text-decoration:line-through}
+.legend i.lg-man{background:var(--muted);opacity:.55}
 .legend i.lg-stop{background:repeating-linear-gradient(45deg,var(--stop) 0 2px,var(--danger-soft) 2px 5px);border:1px solid var(--stop)}
 .gsel{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
 .gsel label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:7px;padding:3px 9px;font-size:12.5px;cursor:pointer;background:var(--panel)}
@@ -321,6 +322,7 @@ dialog.wide:not([open]){display:none}
         <label>Dia início<input data-s="diaInicio" inputmode="numeric"></label>
         <label>Dia fim<input data-s="diaFim" inputmode="numeric"></label>
         <label title="Quanto o processo consegue entregar por dia. O simulador avisa quando o backlog exigido pelo cenário passa disso.">Backlog máximo (kt/dia)<input data-s="backlogMax" inputmode="decimal" placeholder="ex.: 109"></label>
+        <label class="chk-s" id="lblManobra" title="Soma 2 h de desatracação depois de cada navio e 4 h de atracação antes de cada navio (menos o primeiro do horizonte sem ETA). Com esta opção, o Impacto (h) fica só para as outras paradas, como manutenção."><input type="checkbox" data-s="manobraAuto"> Somar manobra (2 h + 4 h)</label>
         <label class="chk-s" id="lblNoite" title="Desatracação (2 h) e atracação (4 h) só entre o nascer e o pôr do sol em Itaguaí. A espera conta como hora perdida (o CN fica parado, porque a CPBS tem um berço só)."><input type="checkbox" data-s="semManobraNoturna"> Sem manobra noturna</label>
         <label class="wide">Observação (o que este cenário considera)<textarea data-s="observacao" placeholder="Premissas, motivo da simulação, fonte do line-up…"></textarea></label>
       </div>
@@ -335,7 +337,7 @@ dialog.wide:not([open]){display:none}
       <div class="tblwrap">
         <table class="edit" id="lineup">
           <thead><tr><th></th><th class="chk" title="Participa do cenário (desmarque para ver o resultado sem este item)"><input type="checkbox" id="chkAllShips"></th><th>#</th><th class="grow">Navio</th><th class="num">Carga (kt)</th><th class="num">Taxa (kt/h)</th><th class="num">Horas</th>
-            <th class="num" title="Horas em que o embarque fica parado logo após este navio (mesma coluna IMPACTOS da planilha)">Impacto (h)</th>
+            <th class="num" data-imp title="Horas em que o embarque fica parado logo após este navio (mesma coluna IMPACTOS da planilha)">Impacto (h)</th>
             <th class="col-det" title="Chegada: o navio não começa antes deste dia/hora">ETA dia</th><th class="col-det">ETA hora</th><th class="col-berco col-det">Berço</th>
             <th>Início</th><th>Fim</th><th></th></tr></thead>
           <tbody></tbody>
@@ -370,7 +372,7 @@ dialog.wide:not([open]){display:none}
     </div>
 
     <div class="card">
-      <h2>Linha do tempo<span class="sp"></span><span class="legend" style="margin:0"><span><i class="lg-stop"></i>CN parado</span><span><i class="lg-out"></i>fora do horizonte</span></span></h2>
+      <h2>Linha do tempo<span class="sp"></span><span class="legend" style="margin:0"><span><i class="lg-man"></i>manobra</span><span><i class="lg-stop"></i>CN parado</span><span><i class="lg-out"></i>fora do horizonte</span></span></h2>
       <div class="chart" id="ganttSim"></div>
     </div>
 
@@ -401,7 +403,8 @@ dialog.wide:not([open]){display:none}
           <li><b>Modo detalhado</b> (opcional): ETA (o navio não começa antes da chegada), berço no TIG (os navios alternam entre Berço Sul e Berço Norte) e impactos com data e hora. “Terminal” para o embarque; impacto de um berço só pausa o navio que estiver naquele berço.</li>
           <li><b>Backlog (kt/dia)</b> = Carga total ÷ dias líquidos, onde dias líquidos = (horas do horizonte − horas perdidas) ÷ 24. Horas perdidas = horas de impacto dentro do horizonte. Mesma fórmula da célula BACKLOG da planilha.</li>
           <li>A hora 00:00 do dia de início é o começo do horizonte. Tudo o que passa do dia fim aparece destacado como “fora do horizonte”.</li>
-          <li><b>Sem manobra noturna</b> (só CPBS): a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço, e só então corre o Impacto (h), que já inclui a troca de navio. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado.</li>
+          <li><b>Somar manobra (2 h + 4 h)</b> (só CPBS): soma 2 h de desatracação logo após o fim do carregamento e 4 h de atracação logo antes do próximo navio. O primeiro navio do horizonte, sem ETA, já está atracado. Com a opção ligada, o Impacto (h) é só para as outras paradas (ex.: manutenção), que acontecem com o berço vazio, entre a desatracação e a atracação. Desligada, a troca de navio continua dentro do Impacto (h), como na planilha. Cenários salvos antes desta opção abrem com ela desligada.</li>
+          <li><b>Sem manobra noturna</b> (só CPBS): a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado.</li>
           <li><b>Previsão de chuva:</b> modelo ECMWF IFS, baixado da Open-Meteo para o ponto do terminal, guardado por 1 hora neste navegador. É só informativa: não entra no cálculo do backlog.</li>
         </ul>
       </details>
@@ -436,7 +439,7 @@ dialog.wide:not([open]){display:none}
     </div>
     <div class="card gantt-wide" id="ganttCard">
       <div class="print-only" id="printGanttHead"></div>
-      <h2>Linha do tempo dos cenários<span class="sp"></span><span class="legend" style="margin:0"><span><i class="lg-stop"></i>CN parado</span><span><i class="lg-out"></i>fora do horizonte</span></span>
+      <h2>Linha do tempo dos cenários<span class="sp"></span><span class="legend" style="margin:0"><span><i class="lg-man"></i>manobra</span><span><i class="lg-stop"></i>CN parado</span><span><i class="lg-out"></i>fora do horizonte</span></span>
         <button class="btn sm noprint" id="btnPrintGantt">Imprimir só esta visão</button></h2>
       <p class="small muted noprint" style="margin:0">Marque os cenários para empilhar no mesmo eixo de datas. O mesmo navio tem a mesma cor em todos.</p>
       <div class="gsel noprint" id="ganttSel"></div>
@@ -554,7 +557,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 function newScenario(terminal = 'TIG'){
   const now = new Date(); const ano = now.getFullYear(), mes = now.getMonth() + 1;
   return { schema: 1, id: uid(), nome: '', terminal, observacao: '', ano, mes, diaInicio: 1, diaFim: daysInMonth(ano, mes),
-    bercos: bercosDo(terminal), modo: 'simples', semManobraNoturna: false, backlogMax: numOrNull(lsGet('simbacklog_max_' + terminal)), arqueado: null, naoArqueado: null, outro: null, navios: [], impactos: [], criadoEm: null, criadoPor: null, atualizadoEm: null, atualizadoPor: null };
+    bercos: bercosDo(terminal), modo: 'simples', semManobraNoturna: false, manobraAuto: false, backlogMax: numOrNull(lsGet('simbacklog_max_' + terminal)), arqueado: null, naoArqueado: null, outro: null, navios: [], impactos: [], criadoEm: null, criadoPor: null, atualizadoEm: null, atualizadoPor: null };
 }
 // TIG tem Berço Sul (1) e Berço Norte (2); CPBS tem um berço só
 const bercosDo = terminal => terminal === 'TIG' ? 2 : 1;
@@ -656,8 +659,12 @@ function simulate(sc){
   const berthFree = Array(nb).fill(0);
   const loaderStops = [];   // intervalos em que o carregador fica parado por impacto, pausa ou parada pós
   const noiteIv = [];       // esperas para atracar ou desatracar de dia (também entram em loaderStops)
-  // manobra noturna proibida: por enquanto só na CPBS (um berço; a espera para o carregador)
+  const manobraIv = [];     // desatracação e atracação somadas automaticamente (também entram em loaderStops)
+  // regras da CPBS (um berço só: a manobra e a espera param o carregador)
+  // semNoite: desatracação e atracação só de dia; manobra: soma 2 h + 4 h entre navios, e o Impacto (h)
+  // fica só para as outras paradas (sem ela, a troca de navio está embutida no Impacto (h))
   const semNoite = sc.terminal === 'CPBS' && !!sc.semManobraNoturna;
+  const manobra = sc.terminal === 'CPBS' && !!sc.manobraAuto;
   const ships = [];
   let nShip = 0;
   sc.navios.forEach(n => {
@@ -682,11 +689,14 @@ function simulate(sc){
       const b = +n.berco;
       if (b <= nb) cands = [b - 1]; else warns.push(`${o.nome}: ${berthName(sc.terminal, b)} não existe; usando automático.`);
     }
-    // atracação só de dia; o primeiro navio do horizonte sem ETA já está atracado
-    const atrDia = semNoite && (prevBerth >= 0 || hasEta);
+    // o primeiro navio do horizonte sem ETA já está atracado: não tem atracação
+    const atraca = prevBerth >= 0 || hasEta, atrDia = semNoite && atraca;
+    const atrH = manobra && atraca ? MANOBRA_H.atracacao : 0;
     let best = null;
     for (const b of cands){
-      const t0 = Math.max(loaderFree, berthFree[b], eta), noite = [];
+      const pronto = Math.max(loaderFree, berthFree[b], eta), noite = [];
+      // com a manobra somada, a atracação começa quando o berço e o navio estão prontos (de dia, se a regra valer)
+      const ini = atrDia && atrH ? proxDia(sc, pronto, atrH) : pronto, t0 = ini + atrH;
       let p = place(t0, o.horas, blocks[b]);
       // a atracação ocupa as últimas horas antes do carregamento; se ela não couber no período diurno
       // (inclusive depois de um impacto), espera o próximo dia e recoloca
@@ -695,20 +705,25 @@ function simulate(sc){
         if (d <= a + EPS) break;
         noite.push([s0, d + MANOBRA_H.atracacao]); p = place(d + MANOBRA_H.atracacao, o.horas, blocks[b]);
       }
+      if (ini > pronto + EPS) noite.unshift([pronto, ini]);
       // empate: alterna o berço (o próximo navio já está atracado no outro)
-      if (!best || p.end < best.end - EPS || (Math.abs(p.end - best.end) <= EPS && best.b === prevBerth && b !== prevBerth)) best = { ...p, b, t0, noite };
+      if (!best || p.end < best.end - EPS || (Math.abs(p.end - best.end) <= EPS && best.b === prevBerth && b !== prevBerth)) best = { ...p, b, pronto, noite };
     }
     o.berco = best.b + 1; o.segs = best.segs; o.start = best.segs[0][0]; o.end = best.end;
-    // desatracação só de dia: o navio carregado espera no berço; depois corre o Impacto (h), que já inclui a troca
-    o.esperaAtr = best.noite.reduce((t, [a, b]) => t + b - a, 0); o.atrDesde = best.t0;
+    // desatracação só de dia: o navio carregado espera no berço; depois vem a desatracação (se somada) e o Impacto (h)
+    o.esperaAtr = best.noite.reduce((t, [a, b]) => t + b - a, 0); o.atrH = atrH;
+    o.atrDesde = o.esperaAtr > EPS || atrH ? best.pronto : o.start;
     o.esperaDes = semNoite ? proxDia(sc, o.end, MANOBRA_H.desatracacao) - o.end : 0;
-    o.parEnd = o.end + o.esperaDes + parada;
+    o.desH = manobra ? MANOBRA_H.desatracacao : 0;
+    o.parEnd = o.end + o.esperaDes + o.desH + parada;
     o.eta = hasEta ? eta : null; o.espera = hasEta ? o.start - eta : null;
     o.pausado = (o.end - o.start) - o.horas;
     loaderFree = o.parEnd; berthFree[best.b] = o.parEnd; prevBerth = best.b;
     for (let j = 1; j < o.segs.length; j++) loaderStops.push([o.segs[j - 1][1], o.segs[j][0]]);
     if (o.parEnd > o.end + EPS) loaderStops.push([o.end, o.parEnd]);
-    if (o.esperaAtr > EPS){ loaderStops.push([best.t0, o.start]); noiteIv.push(...best.noite); }
+    if (o.esperaAtr > EPS || atrH){ loaderStops.push([best.pronto, o.start]); noiteIv.push(...best.noite); }
+    if (atrH) manobraIv.push([o.start - atrH, o.start]);
+    if (o.desH) manobraIv.push([o.end + o.esperaDes, o.end + o.esperaDes + o.desH]);
     if (o.esperaDes > EPS) noiteIv.push([o.end, o.end + o.esperaDes]);
     ships.push(o);
   });
@@ -737,7 +752,7 @@ function simulate(sc){
   for (const s of valid){
     s.impDaily = Array(nDays).fill(0);
     const iv = [[s.end, s.parEnd]]; for (let j = 1; j < s.segs.length; j++) iv.push([s.segs[j - 1][1], s.segs[j][0]]);
-    if (s.esperaAtr > EPS) iv.push([s.atrDesde, s.start]);
+    if (s.start - s.atrDesde > EPS) iv.push([s.atrDesde, s.start]);
     for (const [a, b] of iv) for (let d = Math.max(0, Math.floor(a / 24)); d < nDays && d * 24 < b; d++) s.impDaily[d] += overlap(a, b, d * 24, d * 24 + 24);
   }
   const cargaTotal = valid.reduce((t, s) => t + s.carga, 0);
@@ -754,13 +769,14 @@ function simulate(sc){
   if (diasLiq <= EPS && valid.length) warns.push('As horas perdidas consomem todo o horizonte: o backlog não pode ser calculado.');
   k.fora = ships.filter(s => s.off).length;
   k.esperaNoite = clippedLen(mergeIntervals(noiteIv), H);   // parte das horas perdidas
+  k.manobra = clippedLen(mergeIntervals(manobraIv), H);     // parte das horas perdidas
   // projeção = total arqueado + embarcado não arqueado + backlog (carga do line-up ativo)
   k.arqueado = num(sc.arqueado) > 0 ? num(sc.arqueado) : 0;
   k.naoArqueado = num(sc.naoArqueado) > 0 ? num(sc.naoArqueado) : 0;
   k.jaEmbarcado = k.arqueado + k.naoArqueado;
   k.projecao = k.jaEmbarcado + cargaTotal;
   k.projecaoHz = k.jaEmbarcado + embarcado;   // só o que cabe até o dia fim
-  return { H, nb, nDays, ships, valid, daily, stopsDaily, stopIv, blocks, imps, k, warns };
+  return { H, nb, nDays, ships, valid, daily, stopsDaily, stopIv, manobraIv, blocks, imps, k, warns };
 }
 
 /* ============================ estado ============================ */
@@ -1161,7 +1177,8 @@ function refresh(){
     const d = num(im.duracao), s = tOf(sc, im.dia, im.hora);
     $('[data-c=fim]', tr).textContent = d > 0 && isFinite(s) ? labelT(sc, s + d) : '—';
   }
-  $('#lblNoite').style.display = sc.terminal === 'CPBS' ? '' : 'none';
+  for (const id of ['#lblNoite', '#lblManobra']) $(id).style.display = sc.terminal === 'CPBS' ? '' : 'none';
+  $('#lineup thead th[data-imp]').title = sc.terminal === 'CPBS' && sc.manobraAuto ? 'Paradas logo após este navio além da manobra, que já é somada (ex.: manutenção)' : 'Horas em que o embarque fica parado logo após este navio (mesma coluna IMPACTOS da planilha)';
   $('#kpis').innerHTML = kpiHTML(res);
   $('#projOut').innerHTML = projHTML(res.k);
   $('#kpis').classList.toggle('bad', res.k.folga !== null && res.k.folga < -EPS);
@@ -1201,7 +1218,9 @@ function kpiHTML(r){
     ${g}${msg}
     <dl class="facts">
       <div><dt>Carga total</dt><dd>${fmt(k.cargaTotal)} kt<small>${k.navios} navio${k.navios === 1 ? '' : 's'}${k.fora ? `, ${k.fora} fora do cálculo` : ''}</small></dd></div>
-      <div><dt>Dias líquidos</dt><dd>${fmt(k.diasLiq, 2)} de ${fmt(k.horizonteDias, 0)}<small>${fmt(k.perdidas, k.perdidas % 1 ? 1 : 0)} h de impacto${k.esperaNoite > EPS ? `, das quais ${fmt(k.esperaNoite, 1)} h aguardando o dia para manobrar` : ''}</small></dd></div>
+      <div><dt>Dias líquidos</dt><dd>${fmt(k.diasLiq, 2)} de ${fmt(k.horizonteDias, 0)}<small>${k.manobra > EPS || k.esperaNoite > EPS
+        ? `${fmt(k.perdidas, 1)} h perdidas: ${[k.manobra > EPS ? `${fmt(k.manobra, 0)} h de manobra` : '', k.esperaNoite > EPS ? `${fmt(k.esperaNoite, 1)} h aguardando o dia` : '', `${fmt(Math.max(0, k.perdidas - k.manobra - k.esperaNoite), 1)} h de impacto`].filter(Boolean).join(', ')}`
+        : `${fmt(k.perdidas, k.perdidas % 1 ? 1 : 0)} h de impacto`}</small></dd></div>
       <div><dt>Fim do último navio</dt><dd>${labelT(sc, k.fimUltimo)}</dd></div>
       <div><dt>Fica para depois do horizonte</dt><dd class="${k.saldo > 0.05 ? 'warn' : ''}">${fmt(k.saldo)} kt</dd></div>
     </dl>`;
@@ -1312,7 +1331,7 @@ function renderStatus(){
     : 'Ainda não salvo.';
   if (cur.dirty) st += ' <span class="dirty">Há alterações não salvas.</span>';
   $('#scStatus').innerHTML = st;
-  $('#printHead').innerHTML = `<h2 style="margin:0">${esc(nome)}</h2><p>${esc(sc.terminal)}, ${sc.diaInicio} a ${sc.diaFim} de ${MESES[sc.mes - 1].toLowerCase()} de ${sc.ano}${sc.terminal === 'CPBS' && sc.semManobraNoturna ? ', sem manobra noturna' : ''}.<br>${sc.atualizadoEm ? `Salvo por ${esc(sc.atualizadoPor)} em ${fmtDate(sc.atualizadoEm)}.` : 'Não salvo.'} Impresso em ${fmtDate(new Date().toISOString())}.</p>${sc.observacao ? `<p style="white-space:pre-wrap"><b>Observação:</b> ${esc(sc.observacao)}</p>` : ''}`;
+  $('#printHead').innerHTML = `<h2 style="margin:0">${esc(nome)}</h2><p>${esc(sc.terminal)}, ${sc.diaInicio} a ${sc.diaFim} de ${MESES[sc.mes - 1].toLowerCase()} de ${sc.ano}${sc.terminal === 'CPBS' && sc.manobraAuto ? ', com manobra de 2 h + 4 h' : ''}${sc.terminal === 'CPBS' && sc.semManobraNoturna ? ', sem manobra noturna' : ''}.<br>${sc.atualizadoEm ? `Salvo por ${esc(sc.atualizadoPor)} em ${fmtDate(sc.atualizadoEm)}.` : 'Não salvo.'} Impresso em ${fmtDate(new Date().toISOString())}.</p>${sc.observacao ? `<p style="white-space:pre-wrap"><b>Observação:</b> ${esc(sc.observacao)}</p>` : ''}`;
   document.title = (cur.dirty ? '• ' : '') + 'Simulador de Backlog';
 }
 
@@ -1478,6 +1497,10 @@ function ganttSVG(lanes, colorOf, opts = {}){
       const x = px(abs(L.sc, a)), w = Math.max(1, px(abs(L.sc, b)) - x);
       g += `<rect x="${x}" y="${by}" width="${w}" height="${bh}" style="fill:url(#${pid});stroke:var(--stop);stroke-width:.8"><title>CN parado: ${labelT(L.sc, a)} a ${labelT(L.sc, b)} (${fmtHoras(b - a)})</title></rect>`;
     }
+    for (const [a, b] of r.manobraIv || []){
+      const x = px(abs(L.sc, a)), w = Math.max(1, px(abs(L.sc, b)) - x);
+      g += `<rect x="${x}" y="${by}" width="${w}" height="${bh}" style="fill:var(--muted);opacity:.55"><title>Manobra: ${labelT(L.sc, a)} a ${labelT(L.sc, b)} (${fmtHoras(b - a)})</title></rect>`;
+    }
     for (const m of r.ships.filter(x => x.manut && x.dur > 0)){
       const x = px(abs(L.sc, m.start)), w = px(abs(L.sc, m.end)) - x, t = fitLabel(m.nome, w);
       if (t) g += `<text x="${x + w / 2}" y="${by + bh / 2 + 4}" text-anchor="middle" style="fill:var(--stop);font-size:10.5px;font-weight:700;paint-order:stroke;stroke:var(--danger-soft);stroke-width:3px;pointer-events:none">${esc(t)}</text>`;
@@ -1539,6 +1562,7 @@ function diffInputs(a, b){
   const out = [];
   const chg = (tag, txt) => out.push({ t: 'chg', tag, txt });
   if (a.terminal !== b.terminal) chg('Terminal', `${esc(a.terminal)} → <b>${esc(b.terminal)}</b>`);
+  if (!!a.manobraAuto !== !!b.manobraAuto) chg('Manobra somada (2 h + 4 h)', `${a.manobraAuto ? 'sim' : 'não'} → <b>${b.manobraAuto ? 'sim' : 'não'}</b>`);
   if (!!a.semManobraNoturna !== !!b.semManobraNoturna) chg('Manobra noturna', `${a.semManobraNoturna ? 'proibida' : 'permitida'} → <b>${b.semManobraNoturna ? 'proibida' : 'permitida'}</b>`);
   if ((a.outro?.id || '') !== (b.outro?.id || '')) chg('Cenário somado (Portos Sul)', `${esc(a.outro?.snap?.nome || '—')} → <b>${esc(b.outro?.snap?.nome || '—')}</b>`);
   for (const [f, l] of [['arqueado', 'Total arqueado'], ['naoArqueado', 'Embarcado não arqueado']])
