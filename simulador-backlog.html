@@ -165,6 +165,7 @@ table.edit tr.mp-row td{background:var(--danger-soft)}
 table.edit input[type=checkbox]{width:auto;margin:0;cursor:pointer;accent-color:var(--accent)}
 table.edit tr.off td:not(.chk):not(.acts){opacity:.42}
 table.edit tr.off input[data-f=nome],table.edit tr.off input[data-f=descricao]{text-decoration:line-through}
+.flag-noite{font-size:11px;font-weight:600;color:var(--warn);background:var(--warn-soft);box-shadow:inset 0 -2px 0 var(--warn-line);border-radius:3px;padding:0 5px;white-space:nowrap}
 .legend i.lg-man{background:var(--muted);opacity:.55}
 .legend i.lg-stop{background:repeating-linear-gradient(45deg,var(--stop) 0 2px,var(--danger-soft) 2px 5px);border:1px solid var(--stop)}
 .gsel{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
@@ -323,7 +324,7 @@ dialog.wide:not([open]){display:none}
         <label>Dia fim<input data-s="diaFim" inputmode="numeric"></label>
         <label title="Quanto o processo consegue entregar por dia. O simulador avisa quando o backlog exigido pelo cenário passa disso.">Backlog máximo (kt/dia)<input data-s="backlogMax" inputmode="decimal" placeholder="ex.: 109"></label>
         <label class="chk-s" id="lblManobra" title="Soma 2 h de desatracação depois de cada navio e 4 h de atracação antes de cada navio (menos o primeiro do horizonte sem ETA). Com esta opção, o Impacto (h) fica só para as outras paradas, como manutenção."><input type="checkbox" data-s="manobraAuto"> Somar manobra (2 h + 4 h)</label>
-        <label class="chk-s" id="lblNoite" title="Desatracação (2 h) e atracação (4 h) só entre o nascer e o pôr do sol em Itaguaí. A espera conta como hora perdida (o CN fica parado, porque a CPBS tem um berço só)."><input type="checkbox" data-s="semManobraNoturna"> Sem manobra noturna</label>
+        <label id="lblNoite" title="Proibir: desatracação (2 h) e atracação (4 h) só entre o nascer e o pôr do sol em Itaguaí; a espera conta como hora perdida. Só sinalizar: não muda o cálculo, só avisa quando o carregamento termina 2 h ou mais depois do pôr do sol.">Manobra noturna<select data-s="noturna"><option value="">Sem restrição</option><option value="restringir">Proibir (espera o dia)</option><option value="sinalizar">Só sinalizar</option></select></label>
         <label class="wide">Observação (o que este cenário considera)<textarea data-s="observacao" placeholder="Premissas, motivo da simulação, fonte do line-up…"></textarea></label>
       </div>
     </div>
@@ -404,7 +405,7 @@ dialog.wide:not([open]){display:none}
           <li><b>Backlog (kt/dia)</b> = Carga total ÷ dias líquidos, onde dias líquidos = (horas do horizonte − horas perdidas) ÷ 24. Horas perdidas = horas de impacto dentro do horizonte. Mesma fórmula da célula BACKLOG da planilha.</li>
           <li>A hora 00:00 do dia de início é o começo do horizonte. Tudo o que passa do dia fim aparece destacado como “fora do horizonte”.</li>
           <li><b>Somar manobra (2 h + 4 h)</b> (só CPBS): soma 2 h de desatracação logo após o fim do carregamento e 4 h de atracação logo antes do próximo navio. O primeiro navio do horizonte, sem ETA, já está atracado, e a desatracação do último não conta, porque depois dele não se carrega mais nada. Com a opção ligada, o Impacto (h) é só para as outras paradas (ex.: manutenção), que acontecem com o berço vazio, entre a desatracação e a atracação. Desligada, a troca de navio continua dentro do Impacto (h), como na planilha. Cenários salvos antes desta opção abrem com ela desligada.</li>
-          <li><b>Sem manobra noturna</b> (só CPBS): a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado, e o último não espera para desatracar.</li>
+          <li><b>Manobra noturna</b> (só CPBS): “Só sinalizar” não muda o cálculo; avisa quando um navio termina de carregar 2 h ou mais depois do pôr do sol (o último navio do horizonte não é avisado). “Proibir”: a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado, e o último não espera para desatracar.</li>
           <li><b>Previsão de chuva:</b> modelo ECMWF IFS, baixado da Open-Meteo para o ponto do terminal, guardado por 1 hora neste navegador. É só informativa: não entra no cálculo do backlog.</li>
         </ul>
       </details>
@@ -557,7 +558,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 function newScenario(terminal = 'TIG'){
   const now = new Date(); const ano = now.getFullYear(), mes = now.getMonth() + 1;
   return { schema: 1, id: uid(), nome: '', terminal, observacao: '', ano, mes, diaInicio: 1, diaFim: daysInMonth(ano, mes),
-    bercos: bercosDo(terminal), modo: 'simples', semManobraNoturna: false, manobraAuto: false, backlogMax: numOrNull(lsGet('simbacklog_max_' + terminal)), arqueado: null, naoArqueado: null, outro: null, navios: [], impactos: [], criadoEm: null, criadoPor: null, atualizadoEm: null, atualizadoPor: null };
+    bercos: bercosDo(terminal), modo: 'simples', noturna: '', manobraAuto: false, backlogMax: numOrNull(lsGet('simbacklog_max_' + terminal)), arqueado: null, naoArqueado: null, outro: null, navios: [], impactos: [], criadoEm: null, criadoPor: null, atualizadoEm: null, atualizadoPor: null };
 }
 // TIG tem Berço Sul (1) e Berço Norte (2); CPBS tem um berço só
 const bercosDo = terminal => terminal === 'TIG' ? 2 : 1;
@@ -616,6 +617,17 @@ function sunTimes(ano, mes, dia, lat, lon){
 }
 // Duração padrão das manobras na CPBS (horas). Já estão dentro do Impacto (h); aqui servem só para a regra noturna.
 const MANOBRA_H = { desatracacao: 2, atracacao: 4 };
+// modo "Só sinalizar": avisa quando o carregamento termina este tanto de horas (ou mais) depois do pôr do sol
+const NOITE_ALERTA_H = 2;
+// Horas desde o último pôr do sol, se t cai à noite; null se é dia.
+function horasNoite(sc, t){
+  const p = RAIN_PTS[sc.terminal] || RAIN_PTS.CPBS, d = Math.floor(t / 24);
+  const sol = k => { const dt = new Date(+sc.ano, +sc.mes - 1, +sc.diaInicio + k); return sunTimes(dt.getFullYear(), dt.getMonth() + 1, dt.getDate(), p.lat, p.lon); };
+  const [nasce, poe] = sol(d);
+  if (t >= d * 24 + poe) return t - (d * 24 + poe);
+  if (t < d * 24 + nasce) return t - ((d - 1) * 24 + sol(d - 1)[1]);
+  return null;
+}
 // Primeiro instante ≥ t em que uma manobra de `dur` horas começa e termina com luz do dia
 // (horas desde 00:00 do dia de início do cenário).
 function proxDia(sc, t, dur = 0){
@@ -663,7 +675,8 @@ function simulate(sc){
   // regras da CPBS (um berço só: a manobra e a espera param o carregador)
   // semNoite: desatracação e atracação só de dia; manobra: soma 2 h + 4 h entre navios, e o Impacto (h)
   // fica só para as outras paradas (sem ela, a troca de navio está embutida no Impacto (h))
-  const semNoite = sc.terminal === 'CPBS' && !!sc.semManobraNoturna;
+  const semNoite = sc.terminal === 'CPBS' && sc.noturna === 'restringir';
+  const sinalNoite = sc.terminal === 'CPBS' && sc.noturna === 'sinalizar';
   const manobra = sc.terminal === 'CPBS' && !!sc.manobraAuto;
   // depois do último navio do horizonte não se carrega mais nada: a desatracação dele não conta
   const ultimoId = [...sc.navios].reverse().find(n => n.ativo !== false && n.tipo !== 'manut' && num(n.carga) > 0 && num(n.taxa) > 0)?.id;
@@ -728,6 +741,12 @@ function simulate(sc){
     if (atrH) manobraIv.push([o.start - atrH, o.start]);
     if (o.desH) manobraIv.push([o.end + o.esperaDes, o.end + o.esperaDes + o.desH]);
     if (o.esperaDes > EPS) noiteIv.push([o.end, o.end + o.esperaDes]);
+    // só sinalizar: o cálculo não muda; avisa se a desatracação cairia bem dentro da noite
+    const hn = sinalNoite && desatraca ? horasNoite(sc, o.end) : null;
+    if (hn !== null && hn >= NOITE_ALERTA_H - EPS){
+      o.alertaNoite = hn;
+      warns.push(`${o.nome} termina de carregar em ${labelT(sc, o.end)}, ${fmtHoras(hn)} depois do pôr do sol: a desatracação cairia à noite.`);
+    }
     ships.push(o);
   });
   const valid = ships.filter(s => s.valid);
@@ -968,6 +987,7 @@ function upgrade(d){
   delete d.embarcado;
   d.navios = (d.navios || []).map(n => newShip({ ...n, id: n.id || uid() }));
   d.impactos = (d.impactos || []).map(i => ({ ...newImpact(d), ...i, id: i.id || uid() }));
+  if (d.semManobraNoturna !== undefined){ if (!d.noturna) d.noturna = d.semManobraNoturna ? 'restringir' : ''; delete d.semManobraNoturna; }
   d.bercos = bercosDo(d.terminal);
   delete d.resumo;
   return d;
@@ -1172,7 +1192,7 @@ function refresh(){
     }
     $('[data-c=horas]', tr).textContent = s.valid ? fmtHoras(s.horas) : '—';
     $('[data-c=inicio]', tr).innerHTML = s.valid ? `${res.nb > 1 && sc.modo === 'detalhado' ? `<b>${berthName(sc.terminal, s.berco, true)}</b> · ` : ''}${labelT(sc, s.start)}${s.espera > EPS ? ` <span class="small" title="Espera desde o ETA">(+${fmtHoras(s.espera)})</span>` : ''}${s.esperaAtr > EPS ? ` <span class="small" title="Espera para atracar de dia">(${fmtHoras(s.esperaAtr)} aguardando o dia)</span>` : ''}` : '—';
-    $('[data-c=fim]', tr).innerHTML = s.valid ? `<span class="${s.end > res.H + EPS ? 'late' : ''}">${labelT(sc, s.end)}</span>${s.pausado > EPS ? ` <span class="small" title="Tempo pausado por impactos">(${fmtHoras(s.pausado)} parado)</span>` : ''}${s.esperaDes > EPS ? ` <span class="small" title="Espera no berço para desatracar de dia">(desatraca ${labelT(sc, s.end + s.esperaDes)})</span>` : ''}` : '—';
+    $('[data-c=fim]', tr).innerHTML = s.valid ? `<span class="${s.end > res.H + EPS ? 'late' : ''}">${labelT(sc, s.end)}</span>${s.pausado > EPS ? ` <span class="small" title="Tempo pausado por impactos">(${fmtHoras(s.pausado)} parado)</span>` : ''}${s.esperaDes > EPS ? ` <span class="small" title="Espera no berço para desatracar de dia">(desatraca ${labelT(sc, s.end + s.esperaDes)})</span>` : ''}${s.alertaNoite ? ` <span class="flag-noite" title="Termina de carregar ${fmtHoras(s.alertaNoite)} depois do pôr do sol: a desatracação cairia à noite">noite</span>` : ''}` : '—';
   }
   for (const im of sc.impactos){
     const tr = $(`#impacts tr[data-id="${im.id}"]`); if (!tr) continue;
@@ -1334,7 +1354,7 @@ function renderStatus(){
     : 'Ainda não salvo.';
   if (cur.dirty) st += ' <span class="dirty">Há alterações não salvas.</span>';
   $('#scStatus').innerHTML = st;
-  $('#printHead').innerHTML = `<h2 style="margin:0">${esc(nome)}</h2><p>${esc(sc.terminal)}, ${sc.diaInicio} a ${sc.diaFim} de ${MESES[sc.mes - 1].toLowerCase()} de ${sc.ano}${sc.terminal === 'CPBS' && sc.manobraAuto ? ', com manobra de 2 h + 4 h' : ''}${sc.terminal === 'CPBS' && sc.semManobraNoturna ? ', sem manobra noturna' : ''}.<br>${sc.atualizadoEm ? `Salvo por ${esc(sc.atualizadoPor)} em ${fmtDate(sc.atualizadoEm)}.` : 'Não salvo.'} Impresso em ${fmtDate(new Date().toISOString())}.</p>${sc.observacao ? `<p style="white-space:pre-wrap"><b>Observação:</b> ${esc(sc.observacao)}</p>` : ''}`;
+  $('#printHead').innerHTML = `<h2 style="margin:0">${esc(nome)}</h2><p>${esc(sc.terminal)}, ${sc.diaInicio} a ${sc.diaFim} de ${MESES[sc.mes - 1].toLowerCase()} de ${sc.ano}${sc.terminal === 'CPBS' && sc.manobraAuto ? ', com manobra de 2 h + 4 h' : ''}${sc.terminal === 'CPBS' && sc.noturna ? (sc.noturna === 'restringir' ? ', sem manobra noturna' : ', manobra noturna sinalizada') : ''}.<br>${sc.atualizadoEm ? `Salvo por ${esc(sc.atualizadoPor)} em ${fmtDate(sc.atualizadoEm)}.` : 'Não salvo.'} Impresso em ${fmtDate(new Date().toISOString())}.</p>${sc.observacao ? `<p style="white-space:pre-wrap"><b>Observação:</b> ${esc(sc.observacao)}</p>` : ''}`;
   document.title = (cur.dirty ? '• ' : '') + 'Simulador de Backlog';
 }
 
@@ -1566,7 +1586,8 @@ function diffInputs(a, b){
   const chg = (tag, txt) => out.push({ t: 'chg', tag, txt });
   if (a.terminal !== b.terminal) chg('Terminal', `${esc(a.terminal)} → <b>${esc(b.terminal)}</b>`);
   if (!!a.manobraAuto !== !!b.manobraAuto) chg('Manobra somada (2 h + 4 h)', `${a.manobraAuto ? 'sim' : 'não'} → <b>${b.manobraAuto ? 'sim' : 'não'}</b>`);
-  if (!!a.semManobraNoturna !== !!b.semManobraNoturna) chg('Manobra noturna', `${a.semManobraNoturna ? 'proibida' : 'permitida'} → <b>${b.semManobraNoturna ? 'proibida' : 'permitida'}</b>`);
+  const NOT = { '': 'sem restrição', restringir: 'proibida', sinalizar: 'só sinalizada' };
+  if ((a.noturna || '') !== (b.noturna || '')) chg('Manobra noturna', `${NOT[a.noturna || '']} → <b>${NOT[b.noturna || '']}</b>`);
   if ((a.outro?.id || '') !== (b.outro?.id || '')) chg('Cenário somado (Portos Sul)', `${esc(a.outro?.snap?.nome || '—')} → <b>${esc(b.outro?.snap?.nome || '—')}</b>`);
   for (const [f, l] of [['arqueado', 'Total arqueado'], ['naoArqueado', 'Embarcado não arqueado']])
     if ((num(a[f]) || 0) !== (num(b[f]) || 0)) chg(l, `${v(num(a[f]) || 0)} → <b>${v(num(b[f]) || 0)}</b> kt`);
