@@ -403,8 +403,8 @@ dialog.wide:not([open]){display:none}
           <li><b>Modo detalhado</b> (opcional): ETA (o navio não começa antes da chegada), berço no TIG (os navios alternam entre Berço Sul e Berço Norte) e impactos com data e hora. “Terminal” para o embarque; impacto de um berço só pausa o navio que estiver naquele berço.</li>
           <li><b>Backlog (kt/dia)</b> = Carga total ÷ dias líquidos, onde dias líquidos = (horas do horizonte − horas perdidas) ÷ 24. Horas perdidas = horas de impacto dentro do horizonte. Mesma fórmula da célula BACKLOG da planilha.</li>
           <li>A hora 00:00 do dia de início é o começo do horizonte. Tudo o que passa do dia fim aparece destacado como “fora do horizonte”.</li>
-          <li><b>Somar manobra (2 h + 4 h)</b> (só CPBS): soma 2 h de desatracação logo após o fim do carregamento e 4 h de atracação logo antes do próximo navio. O primeiro navio do horizonte, sem ETA, já está atracado. Com a opção ligada, o Impacto (h) é só para as outras paradas (ex.: manutenção), que acontecem com o berço vazio, entre a desatracação e a atracação. Desligada, a troca de navio continua dentro do Impacto (h), como na planilha. Cenários salvos antes desta opção abrem com ela desligada.</li>
-          <li><b>Sem manobra noturna</b> (só CPBS): a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado.</li>
+          <li><b>Somar manobra (2 h + 4 h)</b> (só CPBS): soma 2 h de desatracação logo após o fim do carregamento e 4 h de atracação logo antes do próximo navio. O primeiro navio do horizonte, sem ETA, já está atracado, e a desatracação do último não conta, porque depois dele não se carrega mais nada. Com a opção ligada, o Impacto (h) é só para as outras paradas (ex.: manutenção), que acontecem com o berço vazio, entre a desatracação e a atracação. Desligada, a troca de navio continua dentro do Impacto (h), como na planilha. Cenários salvos antes desta opção abrem com ela desligada.</li>
+          <li><b>Sem manobra noturna</b> (só CPBS): a manobra inteira tem que caber entre o nascer e o pôr do sol em Itaguaí, calculados para cada data: desatracação de 2 h, logo após o fim do carregamento, e atracação de 4 h, logo antes do início do próximo. O navio que não consegue desatracar de dia espera no berço. Se a atracação do próximo cairia à noite, ele espera o dia. Como a CPBS tem um berço só, as esperas contam como horas perdidas. O primeiro navio do horizonte, sem ETA, é considerado já atracado, e o último não espera para desatracar.</li>
           <li><b>Previsão de chuva:</b> modelo ECMWF IFS, baixado da Open-Meteo para o ponto do terminal, guardado por 1 hora neste navegador. É só informativa: não entra no cálculo do backlog.</li>
         </ul>
       </details>
@@ -665,6 +665,8 @@ function simulate(sc){
   // fica só para as outras paradas (sem ela, a troca de navio está embutida no Impacto (h))
   const semNoite = sc.terminal === 'CPBS' && !!sc.semManobraNoturna;
   const manobra = sc.terminal === 'CPBS' && !!sc.manobraAuto;
+  // depois do último navio do horizonte não se carrega mais nada: a desatracação dele não conta
+  const ultimoId = [...sc.navios].reverse().find(n => n.ativo !== false && n.tipo !== 'manut' && num(n.carga) > 0 && num(n.taxa) > 0)?.id;
   const ships = [];
   let nShip = 0;
   sc.navios.forEach(n => {
@@ -713,8 +715,9 @@ function simulate(sc){
     // desatracação só de dia: o navio carregado espera no berço; depois vem a desatracação (se somada) e o Impacto (h)
     o.esperaAtr = best.noite.reduce((t, [a, b]) => t + b - a, 0); o.atrH = atrH;
     o.atrDesde = o.esperaAtr > EPS || atrH ? best.pronto : o.start;
-    o.esperaDes = semNoite ? proxDia(sc, o.end, MANOBRA_H.desatracacao) - o.end : 0;
-    o.desH = manobra ? MANOBRA_H.desatracacao : 0;
+    const desatraca = n.id !== ultimoId;
+    o.esperaDes = semNoite && desatraca ? proxDia(sc, o.end, MANOBRA_H.desatracacao) - o.end : 0;
+    o.desH = manobra && desatraca ? MANOBRA_H.desatracacao : 0;
     o.parEnd = o.end + o.esperaDes + o.desH + parada;
     o.eta = hasEta ? eta : null; o.espera = hasEta ? o.start - eta : null;
     o.pausado = (o.end - o.start) - o.horas;
